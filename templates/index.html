@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Speech-to-Text-GPT 🎙️</title>
+    <link rel="stylesheet" href="../static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Speech-to-Text-GPT 🎙️</h1>
+    </header>
+    <main>
+      <button id="button">Start listening</button>
+      <div id="result"></div>
+      <div id="server-response"></div>
+      <!-- Display server response here -->
+      <p id="message" hidden aria-hidden="true">
+        Your browser doesn't support Speech Recognition. Sorry.
+      </p>
+    </main>
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const button = document.getElementById("button");
+        const result = document.getElementById("result");
+        const serverResponse = document.getElementById("server-response"); // Added server response element
+        const main = document.getElementsByTagName("main")[0];
+
+        const SpeechRecognition =
+          window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (typeof SpeechRecognition === "undefined") {
+          button.remove();
+          const message = document.getElementById("message");
+          message.removeAttribute("hidden");
+          message.setAttribute("aria-hidden", "false");
+        } else {
+          let listening = false;
+          const recognition = new SpeechRecognition();
+
+          const start = () => {
+            recognition.start();
+            button.textContent = "Stop listening";
+            main.classList.add("speaking");
+          };
+
+          const stop = () => {
+            recognition.stop();
+            button.textContent = "Start listening";
+            main.classList.remove("speaking");
+            // Send the generated text to the server
+            const generatedText = result.textContent;
+            sendToServer(generatedText);
+          };
+
+          const onResult = (event) => {
+            result.innerHTML = "";
+            for (const res of event.results) {
+              const text = document.createTextNode(res[0].transcript);
+              const p = document.createElement("p");
+              if (res.isFinal) {
+                p.classList.add("final");
+              }
+              p.appendChild(text);
+              result.appendChild(p);
+            }
+          };
+
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.addEventListener("result", onResult);
+
+          button.addEventListener("click", () => {
+            listening ? stop() : start();
+            listening = !listening;
+          });
+
+          function sendToServer(text) {
+            fetch("/process_text", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ text: text }),
+            })
+              .then((response) => response.json())
+              .then((data) => {
+                serverResponse.textContent = "GPT: " + data.output_text;
+              })
+              .catch((error) => {
+                console.error("Error:", error);
+              });
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
